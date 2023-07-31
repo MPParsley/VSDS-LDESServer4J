@@ -1,7 +1,7 @@
-package be.vlaanderen.informatievlaanderen.ldes.server.retention.mapper;
+package be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties.mapper;
 
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.entities.MemberProperties;
-import be.vlaanderen.informatievlaanderen.ldes.server.retention.entities.MemberPropertiesEntity;
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties.entities.MemberPropertiesEntity;
 import org.springframework.stereotype.Component;
 
 @Component

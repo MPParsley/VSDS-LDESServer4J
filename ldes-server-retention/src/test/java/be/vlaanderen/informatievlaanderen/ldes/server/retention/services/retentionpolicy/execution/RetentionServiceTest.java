@@ -27,7 +27,7 @@ class RetentionServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		retentionService = new RetentionService(memberPropertiesRepository, memberRemover,
+		retentionService = new RetentionService(memberPropertiesRepository, memberReferencesRepository, memberRemover,
 				retentionPolicyCollection);
 	}
 

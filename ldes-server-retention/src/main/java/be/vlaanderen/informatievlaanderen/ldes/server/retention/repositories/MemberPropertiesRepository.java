@@ -14,8 +14,6 @@ public interface MemberPropertiesRepository {
 
 	Optional<MemberProperties> retrieve(String id);
 
-	void addViewReference(String id, String viewName);
-
 	List<MemberProperties> getMemberPropertiesOfVersionAndView(String versionOf, String viewName);
 
 	Stream<MemberProperties> getMemberPropertiesWithViewReference(String viewName);
@@ -25,4 +23,6 @@ public interface MemberPropertiesRepository {
 	void removeMemberPropertiesOfCollection(String collectionName);
 
 	void deleteById(String id);
+
+	Stream<MemberProperties> getMemberPropertiesByIds(List<String> membersOfView);
 }

@@ -1,7 +1,9 @@
 package be.vlaanderen.informatievlaanderen.ldes.server.retention.services.retentionpolicy.execution;
 
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.entities.MemberProperties;
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.entities.MemberReferences;
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.repositories.MemberPropertiesRepository;
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.repositories.MemberReferencesRepository;
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.repositories.RetentionPolicyCollection;
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.services.retentionpolicy.definition.RetentionPolicy;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -9,17 +11,20 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class RetentionService {
 
 	private final MemberPropertiesRepository memberPropertiesRepository;
+	private final MemberReferencesRepository memberReferencesRepository;
 	private final MemberRemover memberRemover;
 	private final RetentionPolicyCollection retentionPolicyCollection;
 
-	public RetentionService(MemberPropertiesRepository memberPropertiesRepository, MemberRemover memberRemover,
-			RetentionPolicyCollection retentionPolicyCollection) {
+	public RetentionService(MemberPropertiesRepository memberPropertiesRepository, MemberReferencesRepository memberReferencesRepository, MemberRemover memberRemover,
+							RetentionPolicyCollection retentionPolicyCollection) {
 		this.memberPropertiesRepository = memberPropertiesRepository;
+		this.memberReferencesRepository = memberReferencesRepository;
 		this.memberRemover = memberRemover;
 		this.retentionPolicyCollection = retentionPolicyCollection;
 	}
@@ -41,17 +46,25 @@ public class RetentionService {
 
 	private void removeMembersFromViewThatMatchRetentionPolicies(String viewName,
 			List<RetentionPolicy> retentionPoliciesOfView) {
-		memberPropertiesRepository.getMemberPropertiesWithViewReference(viewName)
-				.filter(memberProperties -> memberMatchesAllRetentionPoliciesOfView(retentionPoliciesOfView, viewName,
-						memberProperties))
-				.forEach(memberProperties -> memberRemover.removeMemberFromView(memberProperties, viewName));
+		memberReferencesRepository.getMemberReferencesByViewName(viewName)
+				.map(memberReferences -> memberPropertiesRepository
+						.retrieve(memberReferences.getMemberId())
+						.map(memberProperties -> createRetentionCandidate(memberReferences, memberProperties)))
+				.flatMap(Optional::stream)
+				.filter(retentionCandidate -> memberMatchesAllRetentionPoliciesOfView(retentionPoliciesOfView, viewName,
+						retentionCandidate))
+				.forEach(retentionCandidate -> memberRemover.removeMemberFromView(retentionCandidate, viewName));
+	}
+
+	private RetentionCandidate createRetentionCandidate(MemberReferences memberReferences, MemberProperties memberProperties) {
+		return new RetentionCandidate(memberProperties, memberReferences);
 	}
 
 	private boolean memberMatchesAllRetentionPoliciesOfView(List<RetentionPolicy> retentionPolicies,
-			String viewName, MemberProperties memberProperties) {
+															String viewName, RetentionCandidate retentionCandidate) {
 		return retentionPolicies
 				.stream()
-				.allMatch(retentionPolicy -> retentionPolicy.matchesPolicyOfView(memberProperties, viewName));
+				.allMatch(retentionPolicy -> retentionPolicy.matchesPolicyOfView(retentionCandidate.getMemberProperties(), viewName));
 	}
 
 }

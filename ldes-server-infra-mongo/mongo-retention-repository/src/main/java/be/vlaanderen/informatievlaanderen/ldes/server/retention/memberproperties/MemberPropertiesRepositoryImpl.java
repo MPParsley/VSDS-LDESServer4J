@@ -1,8 +1,8 @@
-package be.vlaanderen.informatievlaanderen.ldes.server.retention;
+package be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties;
 
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.entities.MemberProperties;
-import be.vlaanderen.informatievlaanderen.ldes.server.retention.entities.MemberPropertiesEntity;
-import be.vlaanderen.informatievlaanderen.ldes.server.retention.mapper.MemberPropertiesEntityMapper;
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties.entities.MemberPropertiesEntity;
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties.mapper.MemberPropertiesEntityMapper;
 import be.vlaanderen.informatievlaanderen.ldes.server.retention.repositories.MemberPropertiesRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -55,15 +55,6 @@ public class MemberPropertiesRepositoryImpl implements MemberPropertiesRepositor
 	}
 
 	@Override
-	public synchronized void addViewReference(String id, String viewName) {
-		Query query = new Query();
-		query.addCriteria(Criteria.where(ID).is(id));
-		Update update = new Update();
-		update.push(VIEWS, viewName);
-		mongoTemplate.upsert(query, update, MemberPropertiesEntity.class);
-	}
-
-	@Override
 	public List<MemberProperties> getMemberPropertiesOfVersionAndView(String versionOf, String viewName) {
 		Query query = new Query();
 		query.addCriteria(Criteria.where(VIEWS).is(viewName).and(VERSION_OF).is(versionOf));
@@ -100,5 +91,13 @@ public class MemberPropertiesRepositoryImpl implements MemberPropertiesRepositor
 	@Override
 	public void deleteById(String id) {
 		memberPropertiesEntityRepository.deleteById(id);
+	}
+
+	@Override
+	public Stream<MemberProperties> getMemberPropertiesByIds(List<String> membersOfView) {
+		Query query = new Query();
+		query.addCriteria(Criteria.where(ID).in(membersOfView));
+		return mongoTemplate.stream(query, MemberPropertiesEntity.class)
+				.map(memberPropertiesEntityMapper::toMemberProperties);
 	}
 }

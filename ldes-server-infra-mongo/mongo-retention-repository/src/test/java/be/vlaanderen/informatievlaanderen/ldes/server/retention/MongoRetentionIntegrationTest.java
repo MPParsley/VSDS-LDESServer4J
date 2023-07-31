@@ -1,5 +1,7 @@
 package be.vlaanderen.informatievlaanderen.ldes.server.retention;
 
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties.MemberPropertiesEntityRepository;
+import be.vlaanderen.informatievlaanderen.ldes.server.retention.memberproperties.MemberPropertiesRepositoryImpl;
 import io.cucumber.spring.CucumberContextConfiguration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -18,6 +20,6 @@ import org.springframework.test.context.ContextConfiguration;
 public class MongoRetentionIntegrationTest {
 
 	@Autowired
-	MemberPropertiesRepositoryImpl memberPropertiesRepository;
+    MemberPropertiesRepositoryImpl memberPropertiesRepository;
 
 }

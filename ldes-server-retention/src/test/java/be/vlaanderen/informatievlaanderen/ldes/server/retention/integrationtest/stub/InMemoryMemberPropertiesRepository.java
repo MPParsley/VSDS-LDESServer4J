@@ -36,12 +36,7 @@ public class InMemoryMemberPropertiesRepository implements MemberPropertiesRepos
 		return Optional.empty();
 	}
 
-	@Override
-	public void addViewReference(String id, String viewName) {
-		memberPropertiesMap.get(id).addViewReference(viewName);
-	}
-
-	@Override
+    @Override
 	public List<MemberProperties> getMemberPropertiesOfVersionAndView(String versionOf, String viewName) {
 		return memberPropertiesMap
 				.values()

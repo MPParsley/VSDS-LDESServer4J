@@ -51,11 +51,6 @@ public class MemberPropertiesRepositorySteps extends MongoRetentionIntegrationTe
 		memberProperties.forEach(memberPropertiesRepository::saveMemberPropertiesWithoutViews);
 	}
 
-	@And("I add the view with name {string} to the MemberProperties with id {string}")
-	public void addViewToMember(String viewName, String memberId) {
-		memberPropertiesRepository.addViewReference(memberId, viewName);
-	}
-
 	@And("I retrieve the MemberProperties with id {string}")
 	public void iRetrieveTheMemberPropertiesWithId(String id) {
 		retrievedMemberProperties = memberPropertiesRepository.retrieve(id).stream().toList();
