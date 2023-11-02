@@ -12,15 +12,21 @@ import be.vlaanderen.informatievlaanderen.ldes.server.admin.domain.view.service.
 import be.vlaanderen.informatievlaanderen.ldes.server.domain.model.DcatView;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.Statement;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static be.vlaanderen.informatievlaanderen.ldes.server.admin.domain.dcat.dcatserver.entities.DcatServer.DCAT_CATALOG;
+import static be.vlaanderen.informatievlaanderen.ldes.server.domain.constants.RdfConstants.DC_IDENTIFIER;
+import static be.vlaanderen.informatievlaanderen.ldes.server.domain.constants.RdfConstants.RDF_SYNTAX_TYPE;
 import static be.vlaanderen.informatievlaanderen.ldes.server.domain.constants.ServerConfig.HOST_NAME_KEY;
+import static org.apache.jena.rdf.model.ResourceFactory.createStringLiteral;
 
 @Service
 public class DcatServerServiceImpl implements DcatServerService {
@@ -78,7 +84,9 @@ public class DcatServerServiceImpl implements DcatServerService {
 		if (!dcatServers.isEmpty()) {
 			throw new DcatAlreadyConfiguredException(dcatServers.get(0).getId());
 		}
-		final DcatServer dcatServer = new DcatServer(UUID.randomUUID().toString(), dcat);
+		String id = UUID.randomUUID().toString();
+		provideDcatWithId(id, dcat);
+		final DcatServer dcatServer = new DcatServer(id, dcat);
 		return dcatServerRepository.saveServerDcat(dcatServer);
 	}
 
@@ -96,4 +104,12 @@ public class DcatServerServiceImpl implements DcatServerService {
 		dcatServerRepository.deleteServerDcat(id);
 	}
 
+	private void provideDcatWithId(String id, Model dcat) {
+		try {
+			Resource subject = dcat.listStatements(null, RDF_SYNTAX_TYPE, DCAT_CATALOG).nextStatement().getSubject();
+			dcat.add(subject, DC_IDENTIFIER, createStringLiteral(id));
+		} catch (NoSuchElementException e) {
+			throw new IllegalArgumentException("Provided dcat must have a statement with a %s predicate".formatted(RDF_SYNTAX_TYPE.toString()), e);
+		}
+	}
 }

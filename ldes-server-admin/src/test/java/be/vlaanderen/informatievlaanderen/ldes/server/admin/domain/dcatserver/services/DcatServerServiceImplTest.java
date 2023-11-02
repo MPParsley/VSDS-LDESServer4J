@@ -10,6 +10,7 @@ import be.vlaanderen.informatievlaanderen.ldes.server.admin.domain.dcat.dcatserv
 import be.vlaanderen.informatievlaanderen.ldes.server.admin.domain.dcat.dcatserver.services.DcatServerServiceImpl;
 import be.vlaanderen.informatievlaanderen.ldes.server.admin.domain.validation.DcatShaclValidator;
 import be.vlaanderen.informatievlaanderen.ldes.server.admin.domain.view.service.DcatViewService;
+import be.vlaanderen.informatievlaanderen.ldes.server.domain.constants.RdfConstants;
 import be.vlaanderen.informatievlaanderen.ldes.server.domain.model.DcatView;
 import be.vlaanderen.informatievlaanderen.ldes.server.domain.model.ViewName;
 import org.apache.jena.rdf.model.Model;
@@ -27,17 +28,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static be.vlaanderen.informatievlaanderen.ldes.server.domain.constants.RdfConstants.RDF_SYNTAX_TYPE;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class DcatServerServiceImplTest {
-	private static final String ID = "id";
-	private static final Model DCAT = ModelFactory.createDefaultModel();
-	private static final DcatServer SERVER_DCAT = new DcatServer(ID, DCAT);
+	private static final String ID = "2a896d35-8c72-4723-83b3-add9b1be96aa";
+	private Model dcat;
+	private DcatServer serverDcat;
 	private DcatServerService service;
 	@Mock
 	private DcatServerRepository repository;
@@ -54,62 +57,91 @@ class DcatServerServiceImplTest {
 				dcatShaclValidator);
 	}
 
-	@Test
-	void when_ServerHasNoDcat_and_CreateDcat_then_ReturnIt() {
-		when(repository.getServerDcat()).thenReturn(List.of());
-		when(repository.saveServerDcat(any())).thenReturn(SERVER_DCAT);
+	@Nested
+	class CreateDcat {
+		@BeforeEach
+		void setUp() {
+			dcat = RDFParser.source("dcat/valid-server-dcat.ttl").lang(Lang.TURTLE).toModel();
+			serverDcat = new DcatServer(ID, dcat);
+		}
 
-		final DcatServer createdDcat = assertDoesNotThrow(() -> service.createDcatServer(DCAT));
+		@Test
+		void when_ServerHasNoDcat_and_CreateDcat_then_ReturnIt() {
+			when(repository.getServerDcat()).thenReturn(List.of());
+			when(repository.saveServerDcat(any())).thenReturn(serverDcat);
 
-		assertEquals(SERVER_DCAT, createdDcat);
-		InOrder inOrder = Mockito.inOrder(repository);
-		inOrder.verify(repository).getServerDcat();
-		inOrder.verify(repository).saveServerDcat(any());
-		inOrder.verifyNoMoreInteractions();
+			final DcatServer createdDcat =  service.createDcatServer(dcat);
+			createdDcat.getDcat().listStatements(null, RdfConstants.DC_IDENTIFIER, ID);
+
+			assertThat(createdDcat).isEqualTo(serverDcat);
+			InOrder inOrder = Mockito.inOrder(repository);
+			inOrder.verify(repository).getServerDcat();
+			inOrder.verify(repository).saveServerDcat(argThat(dcatServer -> dcatServer.getDcat().listObjectsOfProperty(RdfConstants.DC_IDENTIFIER).hasNext()));
+			inOrder.verifyNoMoreInteractions();
+		}
+
+		@Test
+		void when_ServerAlreadyHasDcatConfigured_then_ThrowException() {
+			when(repository.getServerDcat()).thenReturn(List.of(serverDcat));
+
+			assertThatThrownBy(() -> service.createDcatServer(dcat))
+					.isInstanceOf(DcatAlreadyConfiguredException.class)
+					.hasMessage("The server can contain only one dcat configuration and there already has been configured one with id %s", ID);
+			verify(repository).getServerDcat();
+			verifyNoMoreInteractions(repository);
+		}
+
+		@Test
+		void when_ServerHasNoDcat_and_CreateDcatWithEmptyModel_then_ThrowException() {
+			when(repository.getServerDcat()).thenReturn(List.of());
+			Model emptyDcat = ModelFactory.createDefaultModel();
+
+			assertThatThrownBy(() -> service.createDcatServer(emptyDcat))
+					.isInstanceOf(IllegalArgumentException.class)
+					.hasMessage("Provided dcat must have a statement with a %s predicate", RDF_SYNTAX_TYPE.toString())
+					.hasCauseInstanceOf(NoSuchElementException.class);
+			verify(repository).getServerDcat();
+			verifyNoMoreInteractions(repository);
+		}
 	}
 
-	@Test
-	void when_ServerAlreadyHasDcatConfigured_then_ThrowException() {
-		when(repository.getServerDcat()).thenReturn(List.of(SERVER_DCAT));
-		final String expectedMessage = "The server can contain only one dcat configuration and there already has been configured one with id "
-				+ ID;
+	@Nested
+	class UpdateDcat {
+		@BeforeEach
+		void setUp() {
+			dcat = RDFParser.source("dcat/server-dcat-with-id.ttl").lang(Lang.TURTLE).toModel();
+			serverDcat = new DcatServer(ID, dcat);
+		}
 
-		Exception e = assertThrows(DcatAlreadyConfiguredException.class, () -> service.createDcatServer(DCAT));
+		@Test
+		void when_UpdateExistingDcat_then_ReturnDcat() {
+			when(repository.getServerDcatById(ID)).thenReturn(Optional.of(serverDcat));
+			when(repository.saveServerDcat(serverDcat)).thenReturn(serverDcat);
 
-		assertEquals(expectedMessage, e.getMessage());
-		verify(repository).getServerDcat();
-		verifyNoMoreInteractions(repository);
-	}
+			DcatServer updatedDcatServer = service.updateDcatServer(ID, dcat);
 
-	@Test
-	void when_UpdateExistingDcat_then_ReturnDcat() {
-		when(repository.getServerDcatById(ID)).thenReturn(Optional.of(SERVER_DCAT));
-		when(repository.saveServerDcat(SERVER_DCAT)).thenReturn(SERVER_DCAT);
+			assertThat(updatedDcatServer).isEqualTo(serverDcat);
+			InOrder inOrder = inOrder(repository);
+			inOrder.verify(repository).getServerDcatById(ID);
+			inOrder.verify(repository).saveServerDcat(DcatServerServiceImplTest.this.serverDcat);
+			inOrder.verifyNoMoreInteractions();
+		}
 
-		DcatServer updatedDcatServer = assertDoesNotThrow(() -> service.updateDcatServer(ID, DCAT));
+		@Test
+		void when_UpdateNonExistingDcat_then_ThrowException() {
+			when(repository.getServerDcatById(ID)).thenReturn(Optional.empty());
 
-		assertEquals(SERVER_DCAT, updatedDcatServer);
-		InOrder inOrder = inOrder(repository);
-		inOrder.verify(repository).getServerDcatById(ID);
-		inOrder.verify(repository).saveServerDcat(SERVER_DCAT);
-		inOrder.verifyNoMoreInteractions();
-	}
-
-	@Test
-	void when_UpdateNonExistingDcat_then_ThrowException() {
-		when(repository.getServerDcatById(ID)).thenReturn(Optional.empty());
-		String expectedMessage = String.format("No dcat is configured on the server with id %s", ID);
-
-		Exception e = assertThrows(MissingDcatServerException.class, () -> service.updateDcatServer(ID, DCAT));
-
-		assertEquals(expectedMessage, e.getMessage());
-		verify(repository).getServerDcatById(ID);
-		verifyNoMoreInteractions(repository);
+			assertThatThrownBy(() -> service.updateDcatServer(ID, dcat))
+					.isInstanceOf(MissingDcatServerException.class)
+					.hasMessage("No dcat is configured on the server with id %s", ID);
+			verify(repository).getServerDcatById(ID);
+			verifyNoMoreInteractions(repository);
+		}
 	}
 
 	@Test
 	void when_DeleteExistingDcat_then_ReturnVoid() {
-		assertDoesNotThrow(() -> service.deleteDcatServer(ID));
+		assertThatNoException().isThrownBy(() -> service.deleteDcatServer(ID));
 		verify(repository).deleteServerDcat(ID);
 		verifyNoMoreInteractions(repository);
 	}
@@ -128,7 +160,7 @@ class DcatServerServiceImplTest {
 
 			Model result = service.getComposedDcat();
 
-			assertTrue(result.isEmpty());
+			assertThat(result).matches(Model::isEmpty);
 			verify(dcatShaclValidator).validate(any());
 		}
 
@@ -142,7 +174,7 @@ class DcatServerServiceImplTest {
 
 			String path = "dcat/dcat-combined-without-views.ttl";
 			Model expectedResult = RDFParser.source(path).lang(Lang.TURTLE).build().toModel();
-			assertTrue(expectedResult.isIsomorphicWith(result));
+			assertThat(result).matches(expectedResult::isIsomorphicWith);
 		}
 
 		@Test
@@ -155,7 +187,7 @@ class DcatServerServiceImplTest {
 
 			String path = "dcat/dcat-combined-all.ttl";
 			Model expectedResult = RDFParser.source(path).lang(Lang.TURTLE).build().toModel();
-			assertTrue(expectedResult.isIsomorphicWith(result));
+			assertThat(result).matches(expectedResult::isIsomorphicWith);
 		}
 
 		private Optional<DcatServer> createServer() {

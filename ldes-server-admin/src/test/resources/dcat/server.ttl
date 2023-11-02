@@ -18,6 +18,7 @@
         foaf:name              "Data Publishing Company" .
 
 [ a                dcat:Catalog ;
+  dct:identifier   "2a896d35-8c72-4723-83b3-add9b1be96aa" ;
   dct:description  "All LDES'es from publiser X"@en ;
   dct:publisher    <http://sample.org/company/PublisherX> ;
   dct:title        "My LDES'es"@en
